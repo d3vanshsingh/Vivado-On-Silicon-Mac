@@ -85,13 +85,13 @@ To resolve the [Common 17-39] LTO plugin crash during Behavioral Simulation, we 
             continue
         fi
     
-        # TRAP 1: Identify and discard standalone '-plugin' flags and their subsequent path arguments
+        # Identify and discard standalone '-plugin' flags and their subsequent path arguments
         if [[ "$i" == "-plugin" ]]; then
             skip=1
             continue
         fi
     
-        # TRAP 2: Identify and discard attached plugin arguments (e.g., -plugin-opt=...)
+        # Identify and discard attached plugin arguments (e.g., -plugin-opt=...)
         if [[ "$i" == -plugin* ]]; then
             continue
         fi
@@ -107,3 +107,39 @@ To resolve the [Common 17-39] LTO plugin crash during Behavioral Simulation, we 
        /usr/bin/ld_arm "$@"
    fi
    ```
+3. Lock the trap
+   `sudo chmod +x /usr/bin/ld`
+Simulation Compilation is unlocked. You can now run Behavioral Simulations successfully. The XSIM Waveform viewer will render natively.
+
+##Taming Multi-threading (Simulation & Synthesis Parameters)
+To stop Rosetta from crashing due to Vivado's built-in parallelization, we need to make the software operate in a strict, single-threaded execution model.
+### 1. GUI Settings
+1. Open Settings (gear icon) -> Simulation.
+2. Elaboration Tab:
+    Locate the xsim.elaborate.xelab.more_options text field.
+    Erase all contents. It must remain entirely blank to prevent conflicting -mt injections.
+3. Compilation Tab:
+   Locate the xsim.compile.xsc.mt_level dropdown.
+   Modify the value from auto to off.
+4. Click Apply. Behavioral Simulations will now execute with maximum stability.
+### Synthesis Settings(Tcl console)
+Do NOT utilize the "Run Synthesis" button within the GUI. The background OS Job Manager will frequently bypass GUI thread limits, resulting in an immediate Rosetta crash.
+
+Instead, execute synthesis entirely within the foreground process utilizing the Tcl Console:
+```
+# Clear corrupted states or stalled background jobs
+reset_run synth_1
+
+# Force the internal Vivado mapping engine to utilize exactly 1 CPU thread
+set_param general.maxThreads 1
+
+# Launch synthesis directly in the active process (bypassing the GUI Job Manager)
+synth_design -top <YOUR_TOP_MODULE_NAME> -part [get_property PART [current_project]]
+```
+NOTE: Upon completion, the Tcl Console may display a red synth_design failed message. Ignore this. It is a graphical synchronization bug caused by bypassing the GUI's Job Manager. Check the top of your workspace—the "Synthesized Design" and "Netlist" tabs will be successfully populated.
+To visualize your hardware logic, type show_schematic [get_cells] in the Tcl Console, or click Layout -> Schematic in the top menu bar.
+
+##Conclusion
+By viewing proprietary compiler toolchains, system linkers, and OS translation layers as clear and changeable systems, we have managed to overcome the hardcoded limits that stop many engineers from using standard VLSI software on modern Apple architecture. This repository shows that with a deep knowledge of underlying system architectures, consumer hardware can be turned into a fully functional Linux EDA workstation
+
+   
