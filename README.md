@@ -27,4 +27,83 @@ Synthesis is the resource-intensive process of converting RTL code into physical
 Because the host environment is ARM-based, the native compilers generate ARM binaries. We must install dedicated cross-compilers capable of generating the x86_64 code that Vivado expects.
 ```
 sudo apt update
-sudo apt install gcc-x86-64-linux-gnu g++-x86-64-linux-gnu```
+sudo apt install gcc-x86-64-linux-gnu g++-x86-64-linux-gnu
+```
+## Creating a fake_bin spoof for Installer
+Vivado’s setup script (xsetup) checks the system architecture with the uname -m command. If the system shows aarch64, the installer immediately stops and shows an "Unsupported architecture" error. We will create a fake_bin directory to intercept these system calls and mimic an x86_64 environment.
+
+1. Initialize the directory
+   `mkdir -p ~/fake_bin`
+2. Spoof the Architecture (uname):
+   `nano ~/fake_bin/uname`
+
+   paste this inside
+   ```
+   #!/bin/bash
+   if [[ "$1" == "-m" ]]; then
+        echo "x86_64" # Deceive the Vivado installer
+   else
+    /usr/bin/uname "$@"
+   fi
+   ```
+2. Reroute the Compilers (gcc and g++):
+   Create `nano ~/fake_bin/gcc:`
+   ```
+   #!/bin/bash
+   /usr/bin/x86_64-linux-gnu-g++ "$@"
+   ```
+   Create `nano ~/fake_bin/g++`
+   ```
+   #!/bin/bash
+   /usr/bin/x86_64-linux-gnu-g++ "$@"
+   ```
+3. Activation and Installation
+   ```
+   chmod +x ~/fake_bin/*
+   export PATH=~/fake_bin:$PATH
+   ```
+   With the PATH environment variable temporarily modified, execute the installer:
+   `sudo -E ./xsetup`
+   (Note: The -E flag is mandatory. It preserves your user environment variables, ensuring the root user executing xsetup still routes through your spoofed fake_bin directory). Proceed to install the Vivado ML Standard Edition.
+
+## Resolving Simulation Issue 
+To resolve the [Common 17-39] LTO plugin crash during Behavioral Simulation, we must replace the default system linker with a middleware Bash script. This script will act as a filter, scrubbing out the incompatible optimization flags before forwarding the sanitized arguments to the true x86 cross-linker.
+
+1. Open the system linker for modification
+   `sudo nano /usr/bin/ld`
+2. Implement the Interceptor Logic:
+   Replace the file contents with the following script:
+```
+    #!/bin/bash
+    declare -a args
+    skip=0
+
+    # Iterate through all arguments passed by Vivado's GCC engine
+    for i in "$@"; do
+        if [ $skip -eq 1 ]; then
+            skip=0
+            continue
+        fi
+    
+        # TRAP 1: Identify and discard standalone '-plugin' flags and their subsequent path arguments
+        if [[ "$i" == "-plugin" ]]; then
+            skip=1
+            continue
+        fi
+    
+        # TRAP 2: Identify and discard attached plugin arguments (e.g., -plugin-opt=...)
+        if [[ "$i" == -plugin* ]]; then
+            continue
+        fi
+    
+         # Retain all validated, safe arguments
+        args+=("$i")
+   done
+
+   # Route the sanitized arguments to the genuine x86_64 cross-linker
+   if [[ "$*" == *"elf_x86_64"* ]]; then
+       /usr/bin/x86_64-linux-gnu-ld "${args[@]}"
+   else
+       /usr/bin/ld_arm "$@"
+   fi
+   ```
