@@ -1,4 +1,4 @@
-# Vivado-On-Silicon-Mac
+# Vivado on Silicon Mac
 
 When trying to run Xilinx Vivado on Apple Silicon (M1/M2/M3), the common advice is to use a Windows 11 ARM Virtual Machine. This method works but comes with significant OS overhead, slow user interface response, and excessive resource use. More importantly, it goes against the industry standard. The global VLSI, EDA, and semiconductor industries mainly use Linux.
 
@@ -139,7 +139,7 @@ synth_design -top <YOUR_TOP_MODULE_NAME> -part [get_property PART [current_proje
 NOTE: Upon completion, the Tcl Console may display a red synth_design failed message. Ignore this. It is a graphical synchronization bug caused by bypassing the GUI's Job Manager. Check the top of your workspace—the "Synthesized Design" and "Netlist" tabs will be successfully populated.
 To visualize your hardware logic, type show_schematic [get_cells] in the Tcl Console, or click Layout -> Schematic in the top menu bar.
 
-##Conclusion
+## Conclusion
 By viewing proprietary compiler toolchains, system linkers, and OS translation layers as clear and changeable systems, we have managed to overcome the hardcoded limits that stop many engineers from using standard VLSI software on modern Apple architecture. This repository shows that with a deep knowledge of underlying system architectures, consumer hardware can be turned into a fully functional Linux EDA workstation
 
    
