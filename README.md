@@ -6,3 +6,5 @@ This repository outlines the specific architectural spoofs, compiler routing log
 
 
 ## The-Architecture
+
+### The Translation layer: Rosetta
